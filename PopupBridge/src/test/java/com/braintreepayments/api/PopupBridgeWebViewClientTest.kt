@@ -11,7 +11,10 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.slot
 import io.mockk.verify
+import junit.framework.TestCase.assertEquals
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -28,6 +31,13 @@ class PopupBridgeWebViewClientTest {
 
     @BeforeTest
     fun setup() {
+        mockkStatic("com.braintreepayments.api.internal.AppInstalledChecksKt")
+
+        every { webView.post(any()) } answers {
+            val runnable = firstArg<Runnable>()
+            runnable.run()
+            true
+        }
     }
 
     @Test
