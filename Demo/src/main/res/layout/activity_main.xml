@@ -45,5 +45,13 @@
         android:onClick="onLPMPopupBridgeClick"
         android:text="Launch Local Payment Methods" />
 
+    <Button
+        android:id="@+id/button_mockmerchantapp_bt_paypal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:contentDescription="Launch mockmerchantapp BT PayPal (stage)"
+        android:onClick="onMockMerchantBtPayPalClick"
+        android:text="mockmerchantapp BT PayPal (stage)" />
+
 
 </LinearLayout>
