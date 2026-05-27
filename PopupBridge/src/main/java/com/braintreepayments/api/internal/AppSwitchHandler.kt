@@ -85,8 +85,10 @@ internal class AppSwitchHandler(
 
     private fun Uri.isPayPalAppSwitchUri(): Boolean {
         val normalizedHost = host?.removePrefix("www.")
+        val isPayPal = normalizedHost == "paypal.com"
+        val isSandbox = normalizedHost == "sandbox.paypal.com"
         return scheme.equals("https", ignoreCase = true) &&
-            normalizedHost == "paypal.com" &&
+            (isPayPal || isSandbox) &&
             path.orEmpty().startsWith("/app-switch-checkout")
     }
 
