@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.ComponentActivity
 import io.mockk.mockk
 import java.lang.ref.WeakReference
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -53,5 +54,18 @@ class AppSwitchHandlerTest {
     fun `isVenmoAppSwitchUri returns false for non-https scheme`() {
         val uri = Uri.parse("http://account.venmo.com/braintree/checkout")
         assertFalse(subject.run { uri.isVenmoAppSwitchUri() })
+    }
+
+    @Test
+    fun `rewriteToVenmoHost replaces account venmo com with venmo com`() {
+        val uri = Uri.parse(
+            "https://account.venmo.com/braintree/checkout" +
+                "?resource_id=abc&x-success=myapp://success&x-cancel=myapp://cancel"
+        )
+        val rewritten = subject.run { uri.rewriteToVenmoHost() }
+        assertEquals("venmo.com", rewritten.host)
+        assertEquals("/braintree/checkout", rewritten.path)
+        assertEquals("abc", rewritten.getQueryParameter("resource_id"))
+        assertEquals("myapp://success", rewritten.getQueryParameter("x-success"))
     }
 }

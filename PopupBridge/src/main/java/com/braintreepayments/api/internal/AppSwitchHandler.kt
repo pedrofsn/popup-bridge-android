@@ -66,9 +66,10 @@ internal class AppSwitchHandler(
         expectingAppSwitchReturn = true
 
         val uri = url.toUri()
-        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+        val targetUri = if (uri.isVenmoAppSwitchUri()) uri.rewriteToVenmoHost() else uri
+        val intent = Intent(Intent.ACTION_VIEW, targetUri).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            if (uri.isPayPalAppSwitchUri()) {
+            if (targetUri.isPayPalAppSwitchUri()) {
                 setPackage(PAYPAL_APP_PACKAGE)
             } else if (uri.isVenmoAppSwitchUri()) {
                 setPackage(VENMO_APP_PACKAGE)
@@ -90,6 +91,10 @@ internal class AppSwitchHandler(
             host.equals("account.venmo.com", ignoreCase = true) &&
             path.orEmpty().startsWith("/braintree/checkout")
     }
+
+    // account.venmo.com/braintree/checkout has no intent filter in the Venmo app.
+    // venmo.com has a broad catch-all filter that handles any path including /braintree/checkout.
+    internal fun Uri.rewriteToVenmoHost(): Uri = buildUpon().authority("venmo.com").build()
 
     private fun Uri.isPayPalAppSwitchUri(): Boolean {
         val normalizedHost = host?.removePrefix("www.")
