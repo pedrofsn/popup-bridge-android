@@ -70,6 +70,8 @@ internal class AppSwitchHandler(
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             if (uri.isPayPalAppSwitchUri()) {
                 setPackage(PAYPAL_APP_PACKAGE)
+            } else if (uri.isVenmoAppSwitchUri()) {
+                setPackage(VENMO_APP_PACKAGE)
             }
         }
 
@@ -81,6 +83,12 @@ internal class AppSwitchHandler(
             analyticsClient.sendEvent(PopupBridgeAnalytics.POPUP_BRIDGE_APP_LAUNCH_FAILED)
             onOpenUrl(url)
         }
+    }
+
+    internal fun Uri.isVenmoAppSwitchUri(): Boolean {
+        return scheme.equals("https", ignoreCase = true) &&
+            host.equals("account.venmo.com", ignoreCase = true) &&
+            path.orEmpty().startsWith("/braintree/checkout")
     }
 
     private fun Uri.isPayPalAppSwitchUri(): Boolean {
