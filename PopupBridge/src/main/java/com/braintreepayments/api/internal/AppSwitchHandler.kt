@@ -86,16 +86,6 @@ internal class AppSwitchHandler(
         }
     }
 
-    internal fun Uri.isVenmoAppSwitchUri(): Boolean {
-        return scheme.equals("https", ignoreCase = true) &&
-            host.equals("account.venmo.com", ignoreCase = true) &&
-            path.orEmpty().startsWith("/braintree/checkout")
-    }
-
-    // account.venmo.com/braintree/checkout has no intent filter in the Venmo app.
-    // venmo.com has a broad catch-all filter that handles any path including /braintree/checkout.
-    internal fun Uri.rewriteToVenmoHost(): Uri = buildUpon().authority("venmo.com").build()
-
     private fun Uri.isPayPalAppSwitchUri(): Boolean {
         val normalizedHost = host?.removePrefix("www.")
         val isPayPal = normalizedHost == "paypal.com"
@@ -125,3 +115,13 @@ internal class AppSwitchHandler(
             isCancelUri()
     }
 }
+
+internal fun Uri.isVenmoAppSwitchUri(): Boolean {
+    return scheme.equals("https", ignoreCase = true) &&
+        host.equals("account.venmo.com", ignoreCase = true) &&
+        path.orEmpty().startsWith("/braintree/checkout")
+}
+
+// account.venmo.com/braintree/checkout has no intent filter in the Venmo app.
+// venmo.com has a broad catch-all filter that handles any path including /braintree/checkout.
+internal fun Uri.rewriteToVenmoHost(): Uri = buildUpon().authority("venmo.com").build()

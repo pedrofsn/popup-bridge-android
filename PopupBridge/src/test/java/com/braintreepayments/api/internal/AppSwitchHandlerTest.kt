@@ -35,25 +35,25 @@ class AppSwitchHandlerTest {
             "https://account.venmo.com/braintree/checkout" +
                 "?resource_id=abc&x-success=myapp://success&x-cancel=myapp://cancel"
         )
-        assertTrue(subject.run { uri.isVenmoAppSwitchUri() })
+        assertTrue(uri.isVenmoAppSwitchUri())
     }
 
     @Test
     fun `isVenmoAppSwitchUri returns false when path does not start with braintree checkout`() {
         val uri = Uri.parse("https://account.venmo.com/")
-        assertFalse(subject.run { uri.isVenmoAppSwitchUri() })
+        assertFalse(uri.isVenmoAppSwitchUri())
     }
 
     @Test
     fun `isVenmoAppSwitchUri returns false for wrong host`() {
         val uri = Uri.parse("https://venmo.com/braintree/checkout")
-        assertFalse(subject.run { uri.isVenmoAppSwitchUri() })
+        assertFalse(uri.isVenmoAppSwitchUri())
     }
 
     @Test
     fun `isVenmoAppSwitchUri returns false for non-https scheme`() {
         val uri = Uri.parse("http://account.venmo.com/braintree/checkout")
-        assertFalse(subject.run { uri.isVenmoAppSwitchUri() })
+        assertFalse(uri.isVenmoAppSwitchUri())
     }
 
     @Test
@@ -62,7 +62,7 @@ class AppSwitchHandlerTest {
             "https://account.venmo.com/braintree/checkout" +
                 "?resource_id=abc&x-success=myapp://success&x-cancel=myapp://cancel"
         )
-        val rewritten = subject.run { uri.rewriteToVenmoHost() }
+        val rewritten = uri.rewriteToVenmoHost()
         assertEquals("venmo.com", rewritten.host)
         assertEquals("/braintree/checkout", rewritten.path)
         assertEquals("abc", rewritten.getQueryParameter("resource_id"))
