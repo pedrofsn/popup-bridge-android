@@ -111,13 +111,15 @@ class PopupBridgeClient @SuppressLint("SetJavaScriptEnabled") internal construct
         webView.addJavascriptInterface(popupBridgeJavascriptInterface, POPUP_BRIDGE_NAME)
         webView.webViewClient = popupBridgeWebViewClient
 
-        if (enablePopupBridgeAppSwitch && activity.applicationContext.isPayPalInstalled()) {
-            analyticsClient.sendEvent(PopupBridgeAnalytics.POPUP_BRIDGE_APP_DETECTED)
+        if (enablePopupBridgeAppSwitch) {
+            popupBridgeJavascriptInterface.onLaunchApp = { url -> appSwitchHandler.launchApp(url) }
+            if (activity.applicationContext.isPayPalInstalled()) {
+                analyticsClient.sendEvent(PopupBridgeAnalytics.POPUP_BRIDGE_APP_DETECTED)
+            }
         }
 
         with(popupBridgeJavascriptInterface) {
             onOpen = { url -> openUrl(url) }
-            onLaunchApp = { url -> appSwitchHandler.launchApp(url) }
             onSendMessage = { messageName, data ->
                 messageListener?.onMessageReceived(messageName, data)
             }
