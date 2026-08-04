@@ -45,5 +45,4 @@
         android:onClick="onLPMPopupBridgeClick"
         android:text="Launch Local Payment Methods" />
 
-
 </LinearLayout>

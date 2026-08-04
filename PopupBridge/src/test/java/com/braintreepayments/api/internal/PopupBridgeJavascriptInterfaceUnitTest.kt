@@ -1,18 +1,26 @@
 package com.braintreepayments.api.internal
 
+import android.content.Context
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import io.mockk.every
+import io.mockk.mockk
 
 class PopupBridgeJavascriptInterfaceUnitTest {
 
     private lateinit var subject: PopupBridgeJavascriptInterface
     private val returnUrlScheme = "test-scheme"
+    private val mockContext = mockk<Context>(relaxed = true)
 
     @Before
     fun setup() {
-        subject = PopupBridgeJavascriptInterface(returnUrlScheme)
+        subject = PopupBridgeJavascriptInterface(returnUrlScheme, mockContext)
     }
 
     @Test
@@ -63,5 +71,60 @@ class PopupBridgeJavascriptInterfaceUnitTest {
 
         assertEquals(testMessageName, capturedMessageName)
         assertEquals(testData, capturedData)
+    }
+
+    @Test
+    fun `isPayPalInstalled returns false when PayPal is not installed`() {
+        val mockPackageManager = mockk<PackageManager>()
+        every { mockContext.packageManager } returns mockPackageManager
+        every {
+            mockPackageManager.getApplicationInfo(PAYPAL_APP_PACKAGE, any<Int>())
+        } throws PackageManager.NameNotFoundException()
+
+        assertFalse(subject.isPayPalInstalled)
+    }
+
+    @Test
+    fun `isPayPalInstalled returns true when PayPal is installed`() {
+        val mockPackageManager = mockk<PackageManager>()
+        every { mockContext.packageManager } returns mockPackageManager
+        every {
+            mockPackageManager.getApplicationInfo(PAYPAL_APP_PACKAGE, any<Int>())
+        } returns mockk<ApplicationInfo>()
+
+        assertTrue(subject.isPayPalInstalled)
+    }
+
+    @Test
+    fun `isVenmoInstalled returns false when venmo is not installed`() {
+        val mockPackageManager = mockk<PackageManager>()
+        every { mockContext.packageManager } returns mockPackageManager
+        every {
+            mockPackageManager.getApplicationInfo(any<String>(), any<Int>())
+        } throws PackageManager.NameNotFoundException()
+
+        val result = subject.isVenmoInstalled
+        assertFalse(result)
+    }
+
+    @Test
+    fun `when launchApp is invoked, onLaunchApp callback is called with url`() {
+        var capturedUrl: String? = null
+        subject.onLaunchApp = { url -> capturedUrl = url }
+
+        val testUrl = "https://www.paypal.com/some/checkout"
+        subject.launchApp(testUrl)
+
+        assertEquals(testUrl, capturedUrl)
+    }
+
+    @Test
+    fun `when launchApp is invoked with null, onLaunchApp callback is called with null`() {
+        var capturedUrl: String? = "not-null"
+        subject.onLaunchApp = { url -> capturedUrl = url }
+
+        subject.launchApp(null)
+
+        assertNull(capturedUrl)
     }
 }

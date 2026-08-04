@@ -13,16 +13,17 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.annotation.RequiresApi
-import com.braintreepayments.api.internal.isVenmoInstalled
+import com.braintreepayments.api.internal.isVenmoAppSwitchUri
 
 @Suppress("TooManyFunctions")
 class PopupBridgeWebViewClient(
     private val delegate: WebViewClient? = null
 ) : WebViewClient() {
 
+    internal var onVenmoUrl: ((String) -> Unit)? = null
+
     override fun onPageFinished(view: WebView?, url: String?) {
         super.onPageFinished(view, url)
-        setVenmoInstalled(view, view?.context?.isVenmoInstalled() == true)
         delegate?.onPageFinished(view, url)
     }
 
@@ -33,6 +34,11 @@ class PopupBridgeWebViewClient(
 
     @RequiresApi(Build.VERSION_CODES.N)
     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+        val url = request?.takeIf { it.isForMainFrame }?.url
+        if (url != null && url.isVenmoAppSwitchUri() && onVenmoUrl != null) {
+            onVenmoUrl?.invoke(url.toString())
+            return true
+        }
         return delegate?.shouldOverrideUrlLoading(view, request) ?: super.shouldOverrideUrlLoading(view, request)
     }
 
@@ -106,28 +112,5 @@ class PopupBridgeWebViewClient(
     override fun onReceivedLoginRequest(view: WebView?, realm: String?, account: String?, args: String?) {
         delegate?.onReceivedLoginRequest(view, realm, account, args)
             ?: super.onReceivedLoginRequest(view, realm, account, args)
-    }
-
-    private fun setVenmoInstalled(view: WebView?, isVenmoInstalled: Boolean) {
-        runJavaScriptInWebView(view,
-            "" +
-                "function setVenmoInstalled() {" +
-                "    window.popupBridge.isVenmoInstalled = $isVenmoInstalled;" +
-                "}" +
-                "" +
-                "if (document.readyState === 'complete') {" +
-                "  setVenmoInstalled();" +
-                "} else {" +
-                "  window.addEventListener('load', function () {" +
-                "    setVenmoInstalled();" +
-                "  });" +
-                "}"
-        )
-    }
-
-    private fun runJavaScriptInWebView(webView: WebView?, script: String) {
-        webView?.post(
-            Runnable { webView.evaluateJavascript(script, null) }
-        )
     }
 }

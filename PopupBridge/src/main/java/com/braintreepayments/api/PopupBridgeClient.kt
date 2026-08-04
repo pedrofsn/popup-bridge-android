@@ -12,6 +12,8 @@ import com.braintreepayments.api.PopupBridgeAnalytics.POPUP_BRIDGE_FAILED
 import com.braintreepayments.api.PopupBridgeAnalytics.POPUP_BRIDGE_SUCCEEDED
 import com.braintreepayments.api.internal.AnalyticsClient
 import com.braintreepayments.api.internal.AnalyticsParamRepository
+import com.braintreepayments.api.internal.AppSwitchHandler
+import com.braintreepayments.api.internal.isVenmoAppSwitchUri
 import com.braintreepayments.api.internal.PendingRequestRepository
 import com.braintreepayments.api.internal.PopupBridgeJavascriptInterface
 import com.braintreepayments.api.internal.PopupBridgeJavascriptInterface.Companion.POPUP_BRIDGE_URL_HOST
@@ -35,7 +37,10 @@ class PopupBridgeClient @SuppressLint("SetJavaScriptEnabled") internal construct
         coroutineScope = activity.lifecycleScope,
     ),
     analyticsParamRepository: AnalyticsParamRepository = AnalyticsParamRepository.instance,
-    popupBridgeJavascriptInterface: PopupBridgeJavascriptInterface = PopupBridgeJavascriptInterface(returnUrlScheme),
+    popupBridgeJavascriptInterface: PopupBridgeJavascriptInterface = PopupBridgeJavascriptInterface(
+        returnUrlScheme = returnUrlScheme,
+        context = activity.applicationContext,
+    ),
 ) {
     private val activityRef = WeakReference(activity)
     private val webViewRef = WeakReference(webView)
@@ -45,16 +50,27 @@ class PopupBridgeClient @SuppressLint("SetJavaScriptEnabled") internal construct
     private var errorListener: PopupBridgeErrorListener? = null
 
     /**
-     * Ensures that [handleReturnToApp] is only called once, even if both `onResume` and `onNewIntent` invoke it.
+     * Browser-switch path only: ensures that [handleReturnToApp] is only called once, even if both `onResume`
+     * and `onNewIntent` invoke it.
      *
-     * If the host app's Activity has a launch type of singleTop, singleTask, or singleInstance, [handleReturnToApp]
-     * should be called in both onResume and onNewIntent. This is to cover all cases where the user cancels the flow.
+     * If the host app's Activity has a launch type of singleTop, singleTask, or singleInstance,
+     * [handleReturnToApp] should be called in both onResume and onNewIntent. This is to cover all cases
+     * where the user cancels the flow.
      *
      * Since the [PendingRequestRepository] functions are suspend functions, we need to ensure that the
      * [handleReturnToApp] logic is only invoked once.
      */
     @Volatile
     private var isHandlingReturnToApp = false
+
+    private val appSwitchHandler = AppSwitchHandler(
+        activityRef = activityRef,
+        analyticsClient = analyticsClient,
+        onOpenUrl = { url -> openUrl(url) },
+        onError = { e -> errorListener?.onError(e) },
+        onCanceled = { runCanceledJavaScript() },
+        onComplete = { uri -> runNotifyCompleteJavaScript(uri) },
+    )
 
     /**
      * Create a new instance of [PopupBridgeClient].
@@ -72,13 +88,13 @@ class PopupBridgeClient @SuppressLint("SetJavaScriptEnabled") internal construct
         activity: ComponentActivity,
         webView: WebView,
         returnUrlScheme: String,
-        popupBridgeWebViewClient: PopupBridgeWebViewClient = PopupBridgeWebViewClient()
+        popupBridgeWebViewClient: PopupBridgeWebViewClient = PopupBridgeWebViewClient(),
     ) : this(
         activity = activity,
         webView = webView,
         returnUrlScheme = returnUrlScheme,
         popupBridgeWebViewClient = popupBridgeWebViewClient,
-        browserSwitchClient = BrowserSwitchClient()
+        browserSwitchClient = BrowserSwitchClient(),
     )
 
     init {
@@ -93,9 +109,18 @@ class PopupBridgeClient @SuppressLint("SetJavaScriptEnabled") internal construct
         webView.settings.javaScriptEnabled = true
         webView.addJavascriptInterface(popupBridgeJavascriptInterface, POPUP_BRIDGE_NAME)
         webView.webViewClient = popupBridgeWebViewClient
+        popupBridgeWebViewClient.onVenmoUrl = { url -> appSwitchHandler.launchApp(url) }
+        popupBridgeJavascriptInterface.onLaunchApp = { url -> appSwitchHandler.launchApp(url) }
 
         with(popupBridgeJavascriptInterface) {
-            onOpen = { url -> openUrl(url) }
+            onOpen = { url ->
+                val uri = url?.toUri()
+                if (uri != null && uri.isVenmoAppSwitchUri()) {
+                    appSwitchHandler.launchApp(url)
+                } else {
+                    openUrl(url)
+                }
+            }
             onSendMessage = { messageName, data ->
                 messageListener?.onMessageReceived(messageName, data)
             }
@@ -115,7 +140,18 @@ class PopupBridgeClient @SuppressLint("SetJavaScriptEnabled") internal construct
     }
 
     fun handleReturnToApp(intent: Intent) {
-        if (isHandlingReturnToApp) return
+        val returnUri = intent.data
+        if (appSwitchHandler.shouldHandleReturn(returnUri)) {
+            appSwitchHandler.handleReturn(returnUri!!)
+            return
+        }
+        if (appSwitchHandler.handleNoResult()) {
+            return
+        }
+
+        if (isHandlingReturnToApp) {
+            return
+        }
         isHandlingReturnToApp = true
 
         coroutineScope.launch {

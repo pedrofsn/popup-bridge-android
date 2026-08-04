@@ -1,5 +1,10 @@
 # PopupBridge Android Release Notes
 
+## unreleased
+
+* Enable PayPal native app switch support by default (remove `enablePayPalAppSwitch` opt-in flag)
+* Fix an issue where a browser-switch return could go unhandled while native app switch was enabled
+
 ## 5.3.0
 
 * Update Android Gradle Plugin version to 8.13.2

@@ -1,5 +1,6 @@
 package com.braintreepayments.api
 
+import android.net.Uri
 import android.os.Message
 import android.view.KeyEvent
 import android.webkit.ClientCertRequest
@@ -9,19 +10,14 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import com.braintreepayments.api.internal.isVenmoInstalled
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.unmockkAll
 import io.mockk.verify
-import junit.framework.TestCase.assertEquals
-import kotlin.test.BeforeTest
 import kotlin.test.Test
+import junit.framework.TestCase.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlinx.coroutines.test.runTest
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
@@ -31,59 +27,14 @@ class PopupBridgeWebViewClientTest {
     private val sut = PopupBridgeWebViewClient()
     private val webView = mockk<WebView>(relaxed = true)
 
-    @BeforeTest
-    fun setup() {
-        mockkStatic("com.braintreepayments.api.internal.AppInstalledChecksKt")
-
-        every { webView.post(any()) } answers {
-            val runnable = firstArg<Runnable>()
-            runnable.run()
-            true
-        }
-    }
-
     @Test
-    fun `on init, when venmo installed, isVenmoInstalled is set to true on the popupBridgeJavascriptInterface`() =
-        runTest {
-        every { webView.context.isVenmoInstalled() } returns true
-
-        sut.onPageFinished(webView, "https://example.com")
-
-        verify {
-            webView.evaluateJavascript(withArg { javascriptString ->
-                assertEquals(getExpectedVenmoInstalledJavascript(true), javascriptString)
-            }, null)
-        }
-
-        unmockkAll()
-    }
-
-    @Test
-    fun `on init, when venmo is not installed, isVenmoInstalled is false on javascriptInterface`() =
-        runTest {
-        every { webView.context.isVenmoInstalled() } returns false
-
-        sut.onPageFinished(webView, "https://example.com")
-
-        verify {
-            webView.evaluateJavascript(withArg { javascriptString ->
-                assertEquals(getExpectedVenmoInstalledJavascript(false), javascriptString)
-            }, null)
-        }
-
-        unmockkAll()
-    }
-
-    @Test
-    fun `onPageFinished calls delegate when provided`() = runTest {
+    fun `onPageFinished calls delegate when provided`() {
         val delegate = mockk<WebViewClient>(relaxed = true)
         val sutWithDelegate = PopupBridgeWebViewClient(delegate)
-        every { webView.context.isVenmoInstalled() } returns false
 
         sutWithDelegate.onPageFinished(webView, "https://example.com")
 
         verify { delegate.onPageFinished(webView, "https://example.com") }
-        unmockkAll()
     }
 
     @Suppress("DEPRECATION")
@@ -123,6 +74,36 @@ class PopupBridgeWebViewClientTest {
     @Test
     fun `shouldOverrideUrlLoading with request returns false when no delegate`() {
         val request = mockk<WebResourceRequest>(relaxed = true)
+
+        val result = sut.shouldOverrideUrlLoading(webView, request)
+
+        assertFalse(result)
+    }
+
+    @Test
+    fun `shouldOverrideUrlLoading invokes onVenmoUrl and returns true for Venmo checkout URL`() {
+        val venmoUri = Uri.parse("https://account.venmo.com/braintree/checkout?resource_id=abc")
+        val request = mockk<WebResourceRequest>(relaxed = true)
+        every { request.isForMainFrame } returns true
+        every { request.url } returns venmoUri
+
+        var capturedUrl: String? = null
+        sut.onVenmoUrl = { url -> capturedUrl = url }
+
+        val result = sut.shouldOverrideUrlLoading(webView, request)
+
+        assertTrue(result)
+        assertEquals("https://account.venmo.com/braintree/checkout?resource_id=abc", capturedUrl)
+    }
+
+    @Test
+    fun `shouldOverrideUrlLoading returns false for Venmo checkout URL when onVenmoUrl is null`() {
+        val venmoUri = Uri.parse("https://account.venmo.com/braintree/checkout?resource_id=abc")
+        val request = mockk<WebResourceRequest>(relaxed = true)
+        every { request.isForMainFrame } returns true
+        every { request.url } returns venmoUri
+
+        sut.onVenmoUrl = null
 
         val result = sut.shouldOverrideUrlLoading(webView, request)
 
@@ -382,22 +363,5 @@ class PopupBridgeWebViewClientTest {
     @Test
     fun `onReceivedLoginRequest does not throw when no delegate`() {
         sut.onReceivedLoginRequest(webView, "realm", "account", "args")
-    }
-
-    private fun getExpectedVenmoInstalledJavascript(isVenmoInstalled: Boolean): String {
-        return String.format(
-            ("" +
-                "function setVenmoInstalled() {" +
-                "    window.popupBridge.isVenmoInstalled = %s;" +
-                "}" +
-                "" +
-                "if (document.readyState === 'complete') {" +
-                "  setVenmoInstalled();" +
-                "} else {" +
-                "  window.addEventListener('load', function () {" +
-                "    setVenmoInstalled();" +
-                "  });" +
-                "}"), isVenmoInstalled
-        )
     }
 }
