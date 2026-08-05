@@ -7,7 +7,9 @@ import android.webkit.CookieManager;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+
 import androidx.appcompat.app.AppCompatActivity;
+
 import com.braintreepayments.api.PopupBridgeClient;
 import com.braintreepayments.api.PopupBridgeWebViewClient;
 
@@ -24,7 +26,6 @@ public class PopupActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_popup);
         webView = findViewById(R.id.web_view);
-        String url = getIntent().getStringExtra("url");
 
         webView.getSettings().setDomStorageEnabled(true);
         webView.getSettings().setJavaScriptEnabled(true);
@@ -37,7 +38,7 @@ public class PopupActivity extends AppCompatActivity {
         popupBridgeClient = new PopupBridgeClient(this, webView, RETURN_URL_SCHEME, popupBridgeWebViewClient);
         popupBridgeClient.setErrorListener(error -> showDialog(error.getMessage()));
 
-        webView.loadUrl(url);
+        webView.loadUrl(getIntent().getStringExtra("url"));
     }
 
     @Override
